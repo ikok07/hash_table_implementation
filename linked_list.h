@@ -8,6 +8,7 @@
 typedef struct {
     int id;
     void *value;
+    bool should_free;
 } linked_list_item_t;
 
 typedef struct linked_list {

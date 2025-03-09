@@ -25,13 +25,7 @@ linked_list_item_t *list_read(linked_list_t *list, int item_id) {
 }
 
 linked_list_t *list_insert(linked_list_t *list, linked_list_item_t *item) {
-    if (list == NULL) {
-        linked_list_t *head = list_allocate();
-        head->item = item;
-        head->next = NULL;
-        list = head;
-        return list;
-    }
+    if (list == NULL) return NULL;
 
     linked_list_t *new_node = list_allocate();
     if (new_node == NULL) return NULL;
@@ -65,10 +59,10 @@ linked_list_t *list_remove(linked_list_t *list, int item_id) {
 void list_node_free(linked_list_t *node) {
     if (node == NULL) return;
 
-    if (node->item != NULL) {
+    if (node->item != NULL && node->item->should_free) {
         if (node->item->value != NULL) free(node->item->value);
         free(node->item);
-    };
+    }
 
     free(node);
 }
