@@ -5,4 +5,6 @@ set(CMAKE_C_STANDARD 23)
 
 add_executable(hash_table_implementation main.c
         linked_list.c
-        linked_list.h)
+        linked_list.h
+        hash_table.c
+        hash_table.h)
