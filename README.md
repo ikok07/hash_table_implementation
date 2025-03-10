@@ -1,7 +1,5 @@
 # Hash Table in C
-#### A basic implementation of a hash table data structure in C
-
----
+##### A basic implementation of a hash table data structure in C
 
 ### Details:
 
