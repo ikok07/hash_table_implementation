@@ -3,7 +3,6 @@
 //
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "hash_table.h"
@@ -12,18 +11,19 @@
 hash_table_item_t *hash_table_item_create(char *key, void *value, size_t value_size) {
     hash_table_item_t *item = malloc(sizeof(hash_table_item_t));
     item->key = malloc(strlen(key) + 1);
-    item->value = malloc(value_size);
-    item->value_size = value_size;
     if (item->key == NULL) {
         free(item);
         return NULL;
     }
+
+    item->value = malloc(value_size);
     if (item->value == NULL) {
         free(item->key);
         free(item);
         return NULL;
     }
 
+    item->value_size = value_size;
     strcpy(item->key, key);
     memcpy(item->value, value, value_size);
 
@@ -34,7 +34,7 @@ hash_table_t *hash_table_create(int size) {
     hash_table_t *table = malloc(sizeof(hash_table_t));
     table->size = size;
     table->count = 0;
-    table->items = malloc(sizeof(hash_table_item_t*));
+    table->items = malloc(sizeof(hash_table_item_t*) * table->size);
 
     for (int i = 0; i < table->size; i++) table->items[i] = NULL;
 
@@ -44,11 +44,11 @@ hash_table_t *hash_table_create(int size) {
 }
 
 // FNV-1a hash function
-int hash_table_create_hash(const char *key) {
+long hash_table_create_hash(const char *key) {
     const uint32_t FNV_PRIME = 16777619;
     const uint32_t FNV_OFFSET_BASIS = 2166136261;
 
-    uint32_t hash = FNV_OFFSET_BASIS;
+    long hash = FNV_OFFSET_BASIS;
 
     for (const unsigned char *p = (const unsigned char *)key; *p; p++) {
         hash ^= *p;
@@ -58,7 +58,7 @@ int hash_table_create_hash(const char *key) {
     return hash;
 }
 
-int handle_collision(hash_table_t *table, hash_table_item_t *item, int index) {
+int handle_collision(const hash_table_t *table, hash_table_item_t *item, const int index) {
     linked_list_item_t *list_item = malloc(sizeof(linked_list_item_t));
 
     list_item->id = malloc(strlen(item->key) + 1);
@@ -92,10 +92,33 @@ int handle_collision(hash_table_t *table, hash_table_item_t *item, int index) {
     return 0;
 }
 
+void *hash_table_search(hash_table_t *table, char *key) {
+    if (table == NULL) {
+        perror("Table is NULL!");
+        return NULL;
+    }
+
+    const int index = (int)(hash_table_create_hash(key) % table->size);
+
+    if (table->items[index] != NULL) {
+        if (strcmp(table->items[index]->key, key) == 0) {
+            return table->items[index]->value;
+        }
+        if (table->overflow_buckets[index] != NULL) {
+            linked_list_t *curr_node = table->overflow_buckets[index];
+            while (curr_node != NULL) {
+                if (curr_node->item != NULL && strcmp(curr_node->item->id, key) == 0) return curr_node->item->value;
+                curr_node = curr_node->next;
+            }
+        }
+    }
+    return NULL;
+}
+
 int hash_table_insert(hash_table_t *table, hash_table_item_t *item) {
     if (table == NULL || item->key == NULL || item->value == NULL) return -1;
 
-    const int index = hash_table_create_hash(item->key) % table->size;
+    const int index = (int)(hash_table_create_hash(item->key) % table->size);
 
     if (table->items[index] == NULL) {
         if (table->count >= table->size) {
@@ -123,7 +146,51 @@ int hash_table_insert(hash_table_t *table, hash_table_item_t *item) {
     return 0;
 }
 
-linked_list_t **hash_table_overflow_buckets_create(int table_size) {
+int hash_table_delete(hash_table_t *table, char *key) {
+    if (table == NULL) {
+        perror("Table is NULL!");
+        return -1;
+    }
+
+    const int index = (int)(hash_table_create_hash(key) % table->size);
+
+    hash_table_item_t *item = table->items[index];
+    if (item == NULL) return - 1;
+
+    linked_list_t *head = table->overflow_buckets[index];
+
+    if (head == NULL && strcmp(table->items[index]->key, key) == 0) {
+        hash_table_free_item(item);
+        table->items[index] = NULL;
+        table->count--;
+        return 0;
+    }
+
+    if (head != NULL) {
+        if (strcmp(table->items[index]->key, key) == 0) {
+            hash_table_free_item(item);
+            linked_list_t *node = head;
+            head = head->next;
+            node->next = NULL;
+            table->items[index] = hash_table_item_create(node->item->id, node->item->value, node->item->value_size);
+            list_node_free(node);
+            table->overflow_buckets[index] = head;
+            table->count--;
+            return 0;
+        }
+
+        linked_list_t *new_head = list_remove(head, key);
+        if (new_head != head) {
+            table->overflow_buckets[index] = new_head;
+            table->count--;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+linked_list_t **hash_table_overflow_buckets_create(const int table_size) {
     linked_list_t **buckets = malloc(sizeof(linked_list_t*) * table_size);
     for (int i = 0; i < table_size; i++) {
         buckets[i] = NULL;
@@ -132,14 +199,14 @@ linked_list_t **hash_table_overflow_buckets_create(int table_size) {
     return buckets;
 }
 
-void hash_table_overflow_buckets_free(hash_table_t *table) {
-    if (table == NULL) return;
+void hash_table_overflow_buckets_free(const hash_table_t *table) {
+    if (table == NULL || table->overflow_buckets == NULL) return;
 
     for (int i = 0; i < table->size; i++) {
         if (table->overflow_buckets[i] != NULL) list_node_free(table->overflow_buckets[i]);
     }
 
-    if (table->overflow_buckets != NULL) free(table->overflow_buckets);
+    free(table->overflow_buckets);
 }
 
 void hash_table_free_item(hash_table_item_t *item) {
@@ -149,12 +216,12 @@ void hash_table_free_item(hash_table_item_t *item) {
 }
 
 void hash_table_free(hash_table_t *table) {
-    if (table == NULL) return;
+    if (table == NULL || table->items == NULL) return;
 
-    for (int i = 0; i < table->size; i++) {
+    for (int i = 0; i < table->count; i++) {
         if (table->items[i] != NULL) hash_table_free_item(table->items[i]);
     }
     hash_table_overflow_buckets_free(table);
-    if (table->items != NULL) free(table->items);
+    free(table->items);
     free(table);
 }

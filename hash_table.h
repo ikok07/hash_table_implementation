@@ -21,13 +21,15 @@ typedef struct {
     int count;
 } hash_table_t;
 
-hash_table_item_t *hash_table_item_create(char *key, void *value);
 hash_table_t *hash_table_create(int size);
+hash_table_item_t *hash_table_item_create(char *key, void *value, size_t value_size);
 
+void *hash_table_search(hash_table_t *table, char *key);
 int hash_table_insert(hash_table_t *table, hash_table_item_t *item);
+int hash_table_delete(hash_table_t *table, char *key);
 
 linked_list_t **hash_table_overflow_buckets_create(int table_size);
-void hash_table_overflow_buckets_free(hash_table_t *table);
+void hash_table_overflow_buckets_free(const hash_table_t *table);
 
 void hash_table_free_item(hash_table_item_t *item);
 void hash_table_free(hash_table_t *table);
