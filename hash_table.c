@@ -106,10 +106,7 @@ void *hash_table_search(hash_table_t *table, char *key) {
         }
         if (table->overflow_buckets[index] != NULL) {
             linked_list_t *curr_node = table->overflow_buckets[index];
-            while (curr_node != NULL) {
-                if (curr_node->item != NULL && strcmp(curr_node->item->id, key) == 0) return curr_node->item->value;
-                curr_node = curr_node->next;
-            }
+            list_read(curr_node, key);
         }
     }
     return NULL;
